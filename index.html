@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <title>A股情绪量化终极版（移动增强）</title>
+    <style>
+        :root {
+            --primary: #d94841;
+            --secondary: #2e86c1;
+            --success: #2a9d57;
+            --bg: #f5f7fb;
+            --text: #263238;
+            --muted: #607d8b;
+            --card: #ffffff;
+            --line: #e3e8ef;
+            --warn-bg: #fff7e6;
+            --warn-line: #f0ad4e;
+        }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            margin: 0;
+            padding: 12px 12px calc(88px + env(safe-area-inset-bottom));
+            background: linear-gradient(180deg, #f9fbff 0%, #f3f6fb 100%);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+        }
+        .card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            box-shadow: 0 4px 14px rgba(33, 53, 71, 0.05);
+            padding: 14px;
+            margin-bottom: 10px;
+        }
+        h3 {
+            margin: 0 0 12px 0;
+            font-size: 15px;
+            border-left: 4px solid var(--primary);
+            padding-left: 8px;
+            color: #22313f;
+        }
+        details {
+            background: #fffdf2;
+            border: 1px dashed #f3d57a;
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        summary {
+            font-size: 13px;
+            color: #8b6c11;
+            font-weight: 700;
+            cursor: pointer;
+            user-select: none;
+        }
+        .helper {
+            font-size: 12px;
+            color: var(--muted);
+            line-height: 1.5;
+            margin-top: 8px;
+        }
+        .tool-row {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .btn-mini {
+            width: 100%;
+            border: 1px solid #d8dee9;
+            background: #f8fafc;
+            color: #2f3b4a;
+            border-radius: 10px;
+            padding: 10px;
+            font-size: 13px;
+            font-weight: 700;
+        }
+        .btn-mini.danger {
+            background: #fff4f4;
+            border-color: #f3c5c5;
+            color: #b23a3a;
+        }
+        .input-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .full-width { grid-column: span 2; }
+        label {
+            display: block;
+            font-size: 12px;
+            color: #526372;
+            margin-bottom: 4px;
+            font-weight: 700;
+            line-height: 1.3;
+        }
+        input, textarea, select {
+            width: 100%;
+            border: 1px solid #d6dde7;
+            border-radius: 10px;
+            background: #fff;
+            padding: 11px 10px;
+            font-size: 16px;
+            color: #1f2d3d;
+        }
+        textarea {
+            min-height: 72px;
+            line-height: 1.4;
+            font-size: 13px;
+            resize: vertical;
+        }
+        .field-tools {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 4px;
+        }
+        .paste-btn {
+            border: 1px solid #dce6f3;
+            background: #eef5ff;
+            color: #2d6ea3;
+            border-radius: 8px;
+            font-size: 12px;
+            padding: 6px 10px;
+            font-weight: 700;
+        }
+        .result-title {
+            font-size: 24px;
+            font-weight: 800;
+            text-align: center;
+            color: var(--primary);
+            margin-bottom: 6px;
+        }
+        .confidence {
+            text-align: center;
+            font-size: 13px;
+            color: #607080;
+            margin-bottom: 3px;
+        }
+        .confidence b {
+            color: var(--primary);
+            font-size: 17px;
+        }
+        .confidence-note {
+            text-align: center;
+            font-size: 12px;
+            color: #8093a4;
+            margin-bottom: 10px;
+        }
+        .confidence-breakdown {
+            background: #f4faff;
+            border: 1px solid #d7e8fa;
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 10px;
+            font-size: 12px;
+            line-height: 1.6;
+            color: #35516b;
+        }
+        .confidence-breakdown .title {
+            font-weight: 800;
+            color: #1f3f5a;
+            margin-bottom: 4px;
+        }
+        .q-row {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+        .q-item {
+            background: #eaf4ff;
+            border: 1px solid #d6eaff;
+            border-radius: 9px;
+            padding: 8px;
+            text-align: center;
+            font-size: 11px;
+            color: #35506a;
+        }
+        .q-val {
+            display: block;
+            color: var(--secondary);
+            font-weight: 800;
+            font-size: 14px;
+            margin-top: 2px;
+        }
+        .warn {
+            background: var(--warn-bg);
+            border-left: 4px solid var(--warn-line);
+            border-radius: 6px;
+            padding: 10px;
+            color: #856404;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+        .sticky-bar {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+            background: rgba(245, 248, 252, 0.92);
+            backdrop-filter: blur(8px);
+            border-top: 1px solid #d9e2ec;
+        }
+        .main-btn {
+            width: 100%;
+            border: none;
+            background: var(--primary);
+            color: #fff;
+            border-radius: 12px;
+            padding: 15px;
+            font-size: 18px;
+            font-weight: 800;
+            box-shadow: 0 6px 14px rgba(217, 72, 65, 0.25);
+        }
+        .main-btn:active { transform: scale(0.98); }
+        #report { display: none; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h3>0. 手机使用与备份</h3>
+    <div class="helper">
+        数据保存在浏览器本地。建议定期“导出备份”，换手机或清缓存后可“导入备份”恢复。
+    </div>
+    <div class="tool-row">
+        <button class="btn-mini" onclick="exportBackup()">导出备份(JSON)</button>
+        <button class="btn-mini" onclick="document.getElementById('import_file').click()">导入备份(JSON)</button>
+        <button class="btn-mini danger" onclick="clearAllData()">清空全部本地数据</button>
+        <button class="btn-mini" onclick="resetContinuity()">重置连续性计数</button>
+    </div>
+    <input id="import_file" type="file" accept=".json,application/json" style="display:none;" onchange="importBackup(event)" />
+</div>
+<div class="card">
+    <h3>1. 历史序列初始化</h3>
+    <details>
+        <summary>点击展开（只需配置一次历史库）</summary>
+        <div style="padding-top:10px;">
+            <label>全A ERP历史</label>
+            <textarea id="h_alla" oninput="saveHistory()"></textarea>
+            <div class="field-tools"><button class="paste-btn" onclick="pasteTo('h_alla')">粘贴</button></div>
+            <label>沪深300 ERP历史</label>
+            <textarea id="h_hs300" oninput="saveHistory()"></textarea>
+            <div class="field-tools"><button class="paste-btn" onclick="pasteTo('h_hs300')">粘贴</button></div>
+            <label>全A PB历史</label>
+            <textarea id="h_pb" oninput="saveHistory()"></textarea>
+            <div class="field-tools"><button class="paste-btn" onclick="pasteTo('h_pb')">粘贴</button></div>
+            <label>USDCNH汇率历史</label>
+            <textarea id="h_fx" oninput="saveHistory()"></textarea>
+            <div class="field-tools"><button class="paste-btn" onclick="pasteTo('h_fx')">粘贴</button></div>
+        </div>
+    </details>
+</div>
+<div class="card">
+    <h3>2. 每日指标录入 + 估值锚模式</h3>
+    <div class="input-grid">
+        <div class="full-width">
+            <label>估值锚模式</label>
+            <select id="anchor_mode" onchange="saveMode()">
+                <option value="dual">双锚（全A ERP + 300 ERP）</option>
+                <option value="triple">三锚（双锚 + 全A PB）</option>
+            </select>
+        </div>
+        <div class="full-width"><label>同花顺全A ERP</label><input type="number" id="c_alla" step="0.01" oninput="saveDaily()" /></div>
+        <div><label>沪深300 ERP</label><input type="number" id="c_hs300" step="0.01" oninput="saveDaily()" /></div>
+        <div><label>同花顺全A PB</label><input type="number" id="c_pb" step="0.01" oninput="saveDaily()" /></div>
+        <div><label>USDCNH价格</label><input type="number" id="c_fx" step="0.0001" oninput="saveDaily()" /></div>
+        <div><label>全A成交额(亿)</label><input type="number" id="amt" oninput="saveDaily()" /></div>
+        <div><label>全A涨跌幅(%)</label><input type="number" id="idx_chg" step="0.01" oninput="saveDaily()" /></div>
+        <div><label>全A换手(%)</label><input type="number" id="to_alla" oninput="saveDaily()" /></div>
+        <div><label>微盘换手(%)</label><input type="number" id="to_micro" oninput="saveDaily()" /></div>
+        <div><label>上涨占比(%)</label><input type="number" id="up" oninput="saveDaily()" /></div>
+        <div><label>昨日涨停表现(%)</label><input type="number" id="limitup" oninput="saveDaily()" /></div>
+        <div><label>红利指数超额(%)</label><input type="number" id="div_excess" oninput="saveDaily()" /></div>
+        <div><label>IM期指溢价(%)</label><input type="number" id="im" oninput="saveDaily()" /></div>
+        <div><label>融资净买(亿)</label><input type="number" id="m_net" oninput="saveDaily()" /></div>
+        <div><label>融资占比(%)</label><input type="number" id="m_ratio" oninput="saveDaily()" /></div>
+        <div><label>宽基流入(亿)</label><input type="number" id="etf" oninput="saveDaily()" /></div>
+    </div>
+</div>
+<div id="report" class="card"><div id="res_area"></div></div>
+<div class="sticky-bar">
+    <button class="main-btn" onclick="run()">深度诊断</button>
+</div>
+<script>
+    var historyKeys = ['h_alla', 'h_hs300', 'h_pb', 'h_fx'];
+    var dailyKeys = [
+        'c_alla','c_hs300','c_pb','c_fx',
+        'amt','idx_chg','to_alla','to_micro','up','limitup','div_excess','im','m_net','m_ratio','etf'
+    ];
+    function saveHistory() {
+        historyKeys.forEach(function(id) {
+            localStorage.setItem(id, document.getElementById(id).value);
+        });
+    }
+    function saveMode() {
+        localStorage.setItem('anchor_mode', document.getElementById('anchor_mode').value);
+    }
+    function saveDaily() {
+        var obj = {};
+        dailyKeys.forEach(function(id) { obj[id] = document.getElementById(id).value; });
+        localStorage.setItem('daily_inputs', JSON.stringify(obj));
+    }
+    function loadDaily() {
+        var raw = localStorage.getItem('daily_inputs');
+        if (!raw) return;
+        try {
+            var obj = JSON.parse(raw);
+            dailyKeys.forEach(function(id) {
+                if (obj[id] !== undefined && obj[id] !== null) document.getElementById(id).value = obj[id];
+            });
+        } catch (e) {}
+    }
+    function loadHistory() {
+        historyKeys.forEach(function(id) {
+            document.getElementById(id).value = localStorage.getItem(id) || '';
+        });
+    }
+    function signWithPlus(n) {
+        if (n > 0) return '+' + n;
+        return String(n);
+    }
+    function getQ(h, v) {
+        if (!h || isNaN(v)) return 0.5;
+        var d = h.trim().split('\n')
+            .map(function(line) { return parseFloat(line.split(/\s+/).pop()); })
+            .filter(function(n) { return !isNaN(n); });
+        var p = d.slice(-249);
+        p.push(v);
+        var s = p.slice().sort(function(a, b) { return a - b; });
+        return s.indexOf(v) / s.length;
+    }
+    function getFxT(h, v) {
+        if (!h || isNaN(v)) return 0;
+        var d = h.trim().split('\n')
+            .map(function(line) { return parseFloat(line.split(/\s+/).pop()); })
+            .filter(function(n) { return !isNaN(n); });
+        if (d.length < 19) return 0;
+        var ma20 = (d.slice(-19).reduce(function(a, b) { return a + b; }, 0) + v) / 20;
+        return (v - ma20) / ma20 * 100;
+    }
+    async function pasteTo(id) {
+        var target = document.getElementById(id);
+        if (!navigator.clipboard || !navigator.clipboard.readText) {
+            alert('当前环境不支持剪贴板读取，请手动粘贴。');
+            target.focus();
+            return;
+        }
+        try {
+            var text = await navigator.clipboard.readText();
+            target.value = text || '';
+            saveHistory();
+        } catch (e) {
+            alert('读取剪贴板失败，请检查浏览器权限后重试。');
+        }
+    }
+    function exportBackup() {
+        var backup = {
+            version: '1.0.0',
+            exportedAt: new Date().toISOString(),
+            history: {},
+            mode: localStorage.getItem('anchor_mode') || 'triple',
+            daily: {},
+            continuity: {
+                prev_stage: localStorage.getItem('prev_stage') || '',
+                prev_streak: localStorage.getItem('prev_streak') || '0'
+            }
+        };
+        historyKeys.forEach(function(k) { backup.history[k] = localStorage.getItem(k) || ''; });
+        dailyKeys.forEach(function(k) { backup.daily[k] = document.getElementById(k).value || ''; });
+        var blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'a-share-quant-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(a.href);
+    }
+    function importBackup(event) {
+        var file = event.target.files && event.target.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                var obj = JSON.parse(e.target.result);
+                if (!obj || typeof obj !== 'object') throw new Error('invalid');
+                if (obj.history) {
+                    historyKeys.forEach(function(k) {
+                        if (obj.history[k] !== undefined) localStorage.setItem(k, String(obj.history[k]));
+                    });
+                }
+                if (obj.mode) localStorage.setItem('anchor_mode', obj.mode);
+                if (obj.daily && typeof obj.daily === 'object') {
+                    localStorage.setItem('daily_inputs', JSON.stringify(obj.daily));
+                }
+                if (obj.continuity && typeof obj.continuity === 'object') {
+                    localStorage.setItem('prev_stage', obj.continuity.prev_stage || '');
+                    localStorage.setItem('prev_streak', String(obj.continuity.prev_streak || '0'));
+                }
+                loadHistory();
+                document.getElementById('anchor_mode').value = localStorage.getItem('anchor_mode') || 'triple';
+                loadDaily();
+                alert('导入成功。');
+            } catch (err) {
+                alert('导入失败：文件格式不正确。');
+            } finally {
+                event.target.value = '';
+            }
+        };
+        reader.readAsText(file, 'utf-8');
+    }
+    function clearAllData() {
+        var key = prompt('此操作不可恢复。请输入 CLEAR 确认清空：');
+        if (key !== 'CLEAR') return;
+        localStorage.removeItem('h_alla');
+        localStorage.removeItem('h_hs300');
+        localStorage.removeItem('h_pb');
+        localStorage.removeItem('h_fx');
+        localStorage.removeItem('anchor_mode');
+        localStorage.removeItem('daily_inputs');
+        localStorage.removeItem('prev_stage');
+        localStorage.removeItem('prev_streak');
+        loadHistory();
+        dailyKeys.forEach(function(id) { document.getElementById(id).value = ''; });
+        document.getElementById('anchor_mode').value = 'triple';
+        document.getElementById('report').style.display = 'none';
+        alert('已清空全部本地数据。');
+    }
+    function resetContinuity() {
+        localStorage.removeItem('prev_stage');
+        localStorage.removeItem('prev_streak');
+        alert('已重置阶段连续性记录。');
+    }
+    function run() {
+        saveDaily();
+        var qA = getQ(document.getElementById('h_alla').value, parseFloat(document.getElementById('c_alla').value));
+        var qH = getQ(document.getElementById('h_hs300').value, parseFloat(document.getElementById('c_hs300').value));
+        var qP = getQ(document.getElementById('h_pb').value, parseFloat(document.getElementById('c_pb').value));
+        var fxT = getFxT(document.getElementById('h_fx').value, parseFloat(document.getElementById('c_fx').value));
+        var anchorMode = document.getElementById('anchor_mode').value;
+        var d = {
+            amt: parseFloat(document.getElementById('amt').value) || 0,
+            idxChg: parseFloat(document.getElementById('idx_chg').value) || 0,
+            up: parseFloat(document.getElementById('up').value) || 50,
+            im: parseFloat(document.getElementById('im').value) || -15,
+            mNet: parseFloat(document.getElementById('m_net').value) || 0,
+            mRatio: parseFloat(document.getElementById('m_ratio').value) || 0,
+            micro: parseFloat(document.getElementById('to_micro').value) || 0,
+            allaTo: parseFloat(document.getElementById('to_alla').value) || 0,
+            limitup: parseFloat(document.getElementById('limitup').value) || 0,
+            divEx: parseFloat(document.getElementById('div_excess').value) || 0,
+            etf: parseFloat(document.getElementById('etf').value) || 0
+        };
+        var s = { start: 0, verify: 0, synergy: 0, div: 0, end: 0 };
+        // 估值双锚/三锚
+        var erpHighCnt = (qA > 0.8 ? 1 : 0) + (qH > 0.8 ? 1 : 0);
+        var erpLowCnt = (qA < 0.2 ? 1 : 0) + (qH < 0.2 ? 1 : 0);
+        if (erpHighCnt === 2) s.start += 3;
+        else if (erpHighCnt === 1) s.start += 1.5;
+        if (qA > 0.65 && qH > 0.65) s.verify += 1;
+        if (erpLowCnt === 2) s.div += 2.5;
+        else if (erpLowCnt === 1) s.div += 1;
+        if (anchorMode === 'triple') {
+            if (qP < 0.2) s.start += 1.5;
+            if (qP < 0.35) s.verify += 0.5;
+            if (qP > 0.8) s.div += 1.5;
+            if (qP > 0.9) s.end += 0.5;
+        }
+        // 核心矩阵
+        if (fxT < -0.8) s.start += 2;
+        if (d.up > 58) s.start += 2;
+        if (d.limitup > 2.5) s.start += 1.5;
+        if (d.etf > -10 && d.idxChg > 0) s.start += 1;
+        if (d.im < -21) s.verify += 3;
+        if (d.mRatio < 8.4) s.verify += 3;
+        if (d.allaTo < 3.0) s.verify += 1;
+        if (d.im > -12 && d.amt > 17000) s.synergy += 4;
+        if (d.mNet > 60) s.synergy += 3;
+        if (d.micro > 4.5) s.synergy += 1.5;
+        if (d.divEx < 0) s.synergy += 1;
+        if (d.amt > 21000) s.div += 3;
+        if (d.mRatio > 10.7) s.div += 3;
+        if (d.up < 35) s.end += 4;
+        if (d.mNet < -150) s.end += 3;
+        var res = [
+            { n: '1. 启动', v: s.start },
+            { n: '2. 验证', v: s.verify },
+            { n: '3. 合力', v: s.synergy },
+            { n: '4. 分歧', v: s.div },
+            { n: '5. 结束', v: s.end }
+        ].sort(function(a, b) { return b.v - a.v; });
+        // 置信度构成
+        var top = res[0].v;
+        var second = res[1].v;
+        var diff = top - second;
+        var baseConf = 50 + diff * 12;
+        var lowTopAdj = (top < 4) ? -8 : 0;
+        var anchorDiverge = (qA > 0.8 && qH < 0.2) || (qA < 0.2 && qH > 0.8);
+        var tripleDiverge = (anchorMode === 'triple' && qP > 0.8 && erpHighCnt >= 1);
+        var anchorAdj = anchorDiverge ? -10 : 0;
+        var tripleAdj = tripleDiverge ? -8 : 0;
+        var currentStage = res[0].n;
+        var prevStage = localStorage.getItem('prev_stage') || '';
+        var prevStreak = parseInt(localStorage.getItem('prev_streak') || '0', 10);
+        var continuityAdj = 0;
+        var continuityText = '连续性修正：0';
+        if (prevStage) {
+            if (currentStage === prevStage) {
+                if (prevStreak >= 4) continuityAdj = 8;
+                else if (prevStreak >= 2) continuityAdj = 5;
+                else continuityAdj = 2;
+                continuityText = '连续性修正：+' + continuityAdj + '（阶段连续）';
+            } else {
+                if (prevStreak >= 3) continuityAdj = -8;
+                else continuityAdj = -4;
+                continuityText = '连续性修正：' + continuityAdj + '（阶段跳变）';
+            }
+        }
+        var rawConf = baseConf + lowTopAdj + anchorAdj + tripleAdj + continuityAdj;
+        var conf = Math.max(5, Math.min(99, rawConf));
+        var confLevel = '';
+        if (conf >= 80) confLevel = '高';
+        else if (conf >= 65) confLevel = '中高';
+        else if (conf >= 50) confLevel = '中等';
+        else confLevel = '偏低';
+        var newStreak = (currentStage === prevStage) ? (prevStreak + 1) : 1;
+        localStorage.setItem('prev_stage', currentStage);
+        localStorage.setItem('prev_streak', String(newStreak));
+        // 输出
+        document.getElementById('report').style.display = 'block';
+        var h = '';
+        h += '<div class="result-title">' + currentStage + '阶段</div>';
+        h += '<div class="confidence">阶段置信度：<b>' + conf.toFixed(0) + '</b>/100（' + confLevel + '）</div>';
+        h += '<div class="confidence-note">' + continuityText + '，当前连续次数：' + newStreak + '</div>';
+        h += '<div class="confidence-breakdown">';
+        h += '<div class="title">置信度构成明细</div>';
+        h += '<div><strong>基础分：</strong>' + baseConf.toFixed(1) + '（由阶段分差 ' + diff.toFixed(1) + ' 计算）</div>';
+        h += '<div><strong>低分修正：</strong>' + signWithPlus(lowTopAdj) + '</div>';
+        h += '<div><strong>双锚分歧：</strong>' + signWithPlus(anchorAdj) + '</div>';
+        h += '<div><strong>三锚分歧：</strong>' + signWithPlus(tripleAdj) + '</div>';
+        h += '<div><strong>连续修正：</strong>' + signWithPlus(continuityAdj) + '</div>';
+        h += '<div><strong>最终结果：</strong>' + conf.toFixed(0) + '/100（原始值 ' + rawConf.toFixed(1) + '，限幅到5-99）</div>';
+        h += '</div>';
+        h += '<div class="q-row">';
+        h += '<div class="q-item">全A ERP分位<span class="q-val">' + (qA * 100).toFixed(1) + '%</span></div>';
+        h += '<div class="q-item">300 ERP分位<span class="q-val">' + (qH * 100).toFixed(1) + '%</span></div>';
+        h += '<div class="q-item">全A PB分位<span class="q-val">' + (qP * 100).toFixed(1) + '%</span></div>';
+        h += '<div class="q-item">全A涨跌幅<span class="q-val">' + d.idxChg + '%</span></div>';
+        h += '<div class="q-item">汇率趋势<span class="q-val">' + fxT.toFixed(2) + '%</span></div>';
+        h += '<div class="q-item">融资占比<span class="q-val">' + d.mRatio + '%</span></div>';
+        h += '</div>';
+        if (d.amt > 16000 && d.amt < 18000) {
+            h += '<div class="warn">🚨 1.6T-1.8T 能级分水岭预警</div>';
+        }
+        if (d.idxChg > 0 && d.etf > 0) {
+            h += '<div class="warn">✅ 共振确认：指数收涨且宽基资金流入。</div>';
+        }
+        if (anchorDiverge) {
+            h += '<div class="warn">⚠️ 双锚分歧：全A与300估值信号相反，已下调置信度。</div>';
+        }
+        if (tripleDiverge) {
+            h += '<div class="warn">⚠️ 三锚分歧：ERP偏积极但PB偏高估，已下调置信度。</div>';
+        }
+        if (continuityAdj < 0) {
+            h += '<div class="warn">⚠️ 阶段跳变：与上一轮诊断不一致，建议次日复核。</div>';
+        }
+        document.getElementById('res_area').innerHTML = h;
+        window.scrollTo(0, document.body.scrollHeight);
+    }
+    // 初始化
+    window.onload = function() {
+        loadHistory();
+        document.getElementById('anchor_mode').value = localStorage.getItem('anchor_mode') || 'triple';
+        loadDaily();
+    };
+</script>
+</body>
+</html>
