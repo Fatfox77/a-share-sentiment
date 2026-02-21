@@ -656,7 +656,8 @@
             ctx.lineTo(w - padding.right, y);
             ctx.stroke();
             ctx.fillStyle = '#6f8193';
-            ctx.fillText(i + ' 阶段', 8, y);
+            var stageText = ['启动', '验证', '合力', '分歧', '结束'][i - 1];
+            ctx.fillText(stageText, 8, y);
         }
         ctx.strokeStyle = '#ccd8e5';
         ctx.beginPath();
