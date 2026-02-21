@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover, user-scalable=no" />
-    <title>A股情绪量化终极版（移动增强）</title>
+    <title>A股情绪量化终极版（移动增强 + 云同步）</title>
     <style>
         :root {
             --primary: #d94841;
@@ -80,6 +80,32 @@
             background: #fff4f4;
             border-color: #f3c5c5;
             color: #b23a3a;
+        }
+        .cloud-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .cloud-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .cloud-status {
+            font-size: 12px;
+            margin-top: 6px;
+            color: #708497;
+        }
+        .cloud-status.ok { color: #1d7a4a; }
+        .cloud-status.err { color: #b34747; }
+        .checkbox-line {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #435768;
+            margin-top: 2px;
         }
         .input-grid {
             display: grid;
@@ -299,9 +325,9 @@
 </head>
 <body>
 <div class="card">
-    <h3>0. 手机使用与备份</h3>
+    <h3>0. 本地备份</h3>
     <div class="helper">
-        数据保存在浏览器本地。建议定期“导出备份”，换手机或清缓存后可“导入备份”恢复。
+        本地 + 云端双保险。仍建议定期导出 JSON 备份，避免任何异常丢失。
     </div>
     <div class="tool-row">
         <button class="btn-mini" onclick="exportBackup()">导出备份(JSON)</button>
@@ -310,6 +336,32 @@
         <button class="btn-mini" onclick="resetContinuity()">重置连续性计数</button>
     </div>
     <input id="import_file" type="file" accept=".json,application/json" style="display:none;" onchange="importBackup(event)" />
+</div>
+<div class="card">
+    <h3>0.5 云端同步（Supabase）</h3>
+    <div class="cloud-grid">
+        <div>
+            <label>Supabase URL</label>
+            <input id="cloud_url" type="text" placeholder="https://xxxx.supabase.co" oninput="saveCloudConfig()" />
+        </div>
+        <div>
+            <label>Supabase anon key</label>
+            <input id="cloud_anon" type="text" placeholder="eyJ..." oninput="saveCloudConfig()" />
+        </div>
+        <div>
+            <label>同步口令（你自定义，同设备共享）</label>
+            <input id="cloud_key" type="text" placeholder="例如：fatfox77-main" oninput="saveCloudConfig()" />
+        </div>
+        <label class="checkbox-line">
+            <input id="cloud_auto" type="checkbox" onchange="saveCloudConfig()" />
+            正式诊断后自动上传云端
+        </label>
+        <div class="cloud-row">
+            <button class="btn-mini" onclick="cloudUpload(true)">上传到云端</button>
+            <button class="btn-mini" onclick="cloudDownload(true)">从云端下载</button>
+        </div>
+        <div id="cloud_status" class="cloud-status">云状态：未连接</div>
+    </div>
 </div>
 <div class="card">
     <h3>1. 历史序列初始化</h3>
@@ -411,6 +463,37 @@
         var day = String(d.getDate()).padStart(2, '0');
         return y + '-' + m + '-' + day;
     }
+    function sanitizeUrl(url) {
+        if (!url) return '';
+        return url.trim().replace(/\/+$/, '');
+    }
+    function getCloudConfig() {
+        return {
+            url: sanitizeUrl(document.getElementById('cloud_url').value),
+            anon: (document.getElementById('cloud_anon').value || '').trim(),
+            key: (document.getElementById('cloud_key').value || '').trim(),
+            auto: !!document.getElementById('cloud_auto').checked
+        };
+    }
+    function saveCloudConfig() {
+        var c = getCloudConfig();
+        localStorage.setItem('cloud_url', c.url);
+        localStorage.setItem('cloud_anon', c.anon);
+        localStorage.setItem('cloud_key', c.key);
+        localStorage.setItem('cloud_auto', c.auto ? '1' : '0');
+    }
+    function loadCloudConfig() {
+        document.getElementById('cloud_url').value = localStorage.getItem('cloud_url') || '';
+        document.getElementById('cloud_anon').value = localStorage.getItem('cloud_anon') || '';
+        document.getElementById('cloud_key').value = localStorage.getItem('cloud_key') || '';
+        document.getElementById('cloud_auto').checked = localStorage.getItem('cloud_auto') === '1';
+    }
+    function updateCloudStatus(text, cls) {
+        var el = document.getElementById('cloud_status');
+        el.className = 'cloud-status';
+        if (cls) el.classList.add(cls);
+        el.textContent = '云状态：' + text;
+    }
     function saveHistory() {
         historyKeys.forEach(function(id) {
             localStorage.setItem(id, document.getElementById(id).value);
@@ -507,9 +590,9 @@
         });
         setRecords(records);
     }
-    function exportBackup() {
+    function buildBackupObject() {
         var backup = {
-            version: '2.1.0',
+            version: '3.0.0',
             exportedAt: new Date().toISOString(),
             history: {},
             mode: localStorage.getItem('anchor_mode') || 'triple',
@@ -519,10 +602,56 @@
                 prev_stage: localStorage.getItem('prev_stage') || '',
                 prev_streak: localStorage.getItem('prev_streak') || '0'
             },
-            diagnosis_records: getRecords()
+            diagnosis_records: getRecords(),
+            cloud: {
+                url: localStorage.getItem('cloud_url') || '',
+                anon: localStorage.getItem('cloud_anon') || '',
+                key: localStorage.getItem('cloud_key') || '',
+                auto: localStorage.getItem('cloud_auto') === '1'
+            }
         };
         historyKeys.forEach(function(k) { backup.history[k] = localStorage.getItem(k) || ''; });
         dailyKeys.forEach(function(k) { backup.daily[k] = document.getElementById(k).value || ''; });
+        return backup;
+    }
+    function applyBackupObject(obj) {
+        if (!obj || typeof obj !== 'object') throw new Error('invalid backup');
+        if (obj.history) {
+            historyKeys.forEach(function(k) {
+                if (obj.history[k] !== undefined) localStorage.setItem(k, String(obj.history[k]));
+            });
+        }
+        if (obj.mode) localStorage.setItem('anchor_mode', obj.mode);
+        if (obj.review_range) localStorage.setItem('review_range', obj.review_range);
+        if (obj.daily && typeof obj.daily === 'object') {
+            localStorage.setItem('daily_inputs', JSON.stringify(obj.daily));
+        }
+        if (obj.continuity && typeof obj.continuity === 'object') {
+            localStorage.setItem('prev_stage', obj.continuity.prev_stage || '');
+            localStorage.setItem('prev_streak', String(obj.continuity.prev_streak || '0'));
+        }
+        if (Array.isArray(obj.diagnosis_records)) {
+            localStorage.setItem('diagnosis_records', JSON.stringify(obj.diagnosis_records));
+        }
+        if (obj.cloud && typeof obj.cloud === 'object') {
+            if (obj.cloud.url !== undefined) localStorage.setItem('cloud_url', String(obj.cloud.url || ''));
+            if (obj.cloud.anon !== undefined) localStorage.setItem('cloud_anon', String(obj.cloud.anon || ''));
+            if (obj.cloud.key !== undefined) localStorage.setItem('cloud_key', String(obj.cloud.key || ''));
+            if (obj.cloud.auto !== undefined) localStorage.setItem('cloud_auto', obj.cloud.auto ? '1' : '0');
+        }
+        loadHistory();
+        document.getElementById('anchor_mode').value = localStorage.getItem('anchor_mode') || 'triple';
+        document.getElementById('review_range').value = localStorage.getItem('review_range') || 'all';
+        loadDaily();
+        loadCloudConfig();
+        if (!document.getElementById('record_date').value) {
+            document.getElementById('record_date').value = todayStr();
+            saveDaily();
+        }
+        renderReviewPanel();
+    }
+    function exportBackup() {
+        var backup = buildBackupObject();
         var blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8' });
         var a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
@@ -539,33 +668,7 @@
         reader.onload = function(e) {
             try {
                 var obj = JSON.parse(e.target.result);
-                if (!obj || typeof obj !== 'object') throw new Error('invalid');
-                if (obj.history) {
-                    historyKeys.forEach(function(k) {
-                        if (obj.history[k] !== undefined) localStorage.setItem(k, String(obj.history[k]));
-                    });
-                }
-                if (obj.mode) localStorage.setItem('anchor_mode', obj.mode);
-                if (obj.review_range) localStorage.setItem('review_range', obj.review_range);
-                if (obj.daily && typeof obj.daily === 'object') {
-                    localStorage.setItem('daily_inputs', JSON.stringify(obj.daily));
-                }
-                if (obj.continuity && typeof obj.continuity === 'object') {
-                    localStorage.setItem('prev_stage', obj.continuity.prev_stage || '');
-                    localStorage.setItem('prev_streak', String(obj.continuity.prev_streak || '0'));
-                }
-                if (Array.isArray(obj.diagnosis_records)) {
-                    localStorage.setItem('diagnosis_records', JSON.stringify(obj.diagnosis_records));
-                }
-                loadHistory();
-                document.getElementById('anchor_mode').value = localStorage.getItem('anchor_mode') || 'triple';
-                document.getElementById('review_range').value = localStorage.getItem('review_range') || 'all';
-                loadDaily();
-                if (!document.getElementById('record_date').value) {
-                    document.getElementById('record_date').value = todayStr();
-                    saveDaily();
-                }
-                renderReviewPanel();
+                applyBackupObject(obj);
                 alert('导入成功。');
             } catch (err) {
                 alert('导入失败：文件格式不正确。');
@@ -574,6 +677,84 @@
             }
         };
         reader.readAsText(file, 'utf-8');
+    }
+    async function cloudUpload(showMsg) {
+        try {
+            saveCloudConfig();
+            var c = getCloudConfig();
+            if (!c.url || !c.anon || !c.key) {
+                updateCloudStatus('请先填写 URL / anon key / 同步口令', 'err');
+                if (showMsg) alert('请先填写云同步配置。');
+                return false;
+            }
+            var backup = buildBackupObject();
+            backup.exportedAt = new Date().toISOString();
+            var endpoint = c.url + '/rest/v1/app_snapshots?on_conflict=sync_key';
+            var body = [{
+                sync_key: c.key,
+                payload: backup,
+                updated_at: new Date().toISOString()
+            }];
+            var resp = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'apikey': c.anon,
+                    'Authorization': 'Bearer ' + c.anon,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'resolution=merge-duplicates,return=minimal'
+                },
+                body: JSON.stringify(body)
+            });
+            if (!resp.ok) {
+                var t = await resp.text();
+                throw new Error(t || ('HTTP ' + resp.status));
+            }
+            updateCloudStatus('上传成功（' + new Date().toLocaleString() + '）', 'ok');
+            if (showMsg) alert('云端上传成功。');
+            return true;
+        } catch (e) {
+            updateCloudStatus('上传失败：' + (e.message || '未知错误'), 'err');
+            if (showMsg) alert('云端上传失败：' + (e.message || '未知错误'));
+            return false;
+        }
+    }
+    async function cloudDownload(showMsg) {
+        try {
+            saveCloudConfig();
+            var c = getCloudConfig();
+            if (!c.url || !c.anon || !c.key) {
+                updateCloudStatus('请先填写 URL / anon key / 同步口令', 'err');
+                if (showMsg) alert('请先填写云同步配置。');
+                return false;
+            }
+            var endpoint = c.url + '/rest/v1/app_snapshots?select=payload,updated_at&sync_key=eq.' +
+                encodeURIComponent(c.key) + '&limit=1';
+            var resp = await fetch(endpoint, {
+                method: 'GET',
+                headers: {
+                    'apikey': c.anon,
+                    'Authorization': 'Bearer ' + c.anon
+                }
+            });
+            if (!resp.ok) {
+                var t = await resp.text();
+                throw new Error(t || ('HTTP ' + resp.status));
+            }
+            var arr = await resp.json();
+            if (!Array.isArray(arr) || !arr.length || !arr[0].payload) {
+                updateCloudStatus('云端无数据', 'err');
+                if (showMsg) alert('云端未找到该同步口令的数据。');
+                return false;
+            }
+            applyBackupObject(arr[0].payload);
+            updateCloudStatus('下载成功（' + (arr[0].updated_at || '') + '）', 'ok');
+            if (showMsg) alert('云端下载并覆盖本地成功。');
+            return true;
+        } catch (e) {
+            updateCloudStatus('下载失败：' + (e.message || '未知错误'), 'err');
+            if (showMsg) alert('云端下载失败：' + (e.message || '未知错误'));
+            return false;
+        }
     }
     function clearAllData() {
         var key = prompt('此操作不可恢复。请输入 CLEAR 确认清空：');
@@ -600,7 +781,7 @@
     function resetContinuity() {
         localStorage.removeItem('prev_stage');
         localStorage.removeItem('prev_streak');
-        alert('已重置阶段连续性记录。');
+        alert('已重置连续性记录。');
     }
     function clearRecords() {
         var ok = confirm('确认清空所有正式复盘记录？此操作不可恢复。');
@@ -655,8 +836,8 @@
             ctx.moveTo(padding.left, y);
             ctx.lineTo(w - padding.right, y);
             ctx.stroke();
-            ctx.fillStyle = '#6f8193';
             var stageText = ['启动', '验证', '合力', '分歧', '结束'][i - 1];
+            ctx.fillStyle = '#6f8193';
             ctx.fillText(stageText, 8, y);
         }
         ctx.strokeStyle = '#ccd8e5';
@@ -727,9 +908,9 @@
         var recent = records.slice(-30).reverse();
         var html = '';
         recent.forEach(function(r) {
+            var cleanStage = (r.stageName || '-').replace(/^\d+\.\s*/, '');
             html += '<div class="record-item">';
             html += '<div>' + (r.date || '-') + '<br><span class="tag ' + (r.type === 'final' ? 'tag-final' : 'tag-preview') + '">' + (r.type === 'final' ? '正式' : '预估') + '</span></div>';
-            var cleanStage = (r.stageName || '-').replace(/^\d+\.\s*/, '');
             html += '<div>' + cleanStage + '<br><span class="muted">模式:' + (r.anchorMode === 'triple' ? '三锚' : '双锚') + '</span></div>';
             html += '<div>置信度<br><b>' + (r.confidence || 0) + '</b></div>';
             html += '</div>';
@@ -876,6 +1057,9 @@
             };
             upsertFinalRecord(record);
             renderReviewPanel();
+            if (document.getElementById('cloud_auto').checked) {
+                cloudUpload(false);
+            }
         }
         document.getElementById('report').style.display = 'block';
         var runTypeText = updateContinuity ? '正式诊断（已更新连续性）' : '预估诊断（未更新连续性）';
@@ -929,11 +1113,13 @@
         document.getElementById('anchor_mode').value = localStorage.getItem('anchor_mode') || 'triple';
         document.getElementById('review_range').value = localStorage.getItem('review_range') || 'all';
         loadDaily();
+        loadCloudConfig();
         if (!document.getElementById('record_date').value) {
             document.getElementById('record_date').value = todayStr();
             saveDaily();
         }
         renderReviewPanel();
+        updateCloudStatus('就绪（请先填 Supabase 配置）', '');
     };
 </script>
 </body>
