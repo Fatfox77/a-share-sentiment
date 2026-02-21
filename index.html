@@ -729,7 +729,8 @@
         recent.forEach(function(r) {
             html += '<div class="record-item">';
             html += '<div>' + (r.date || '-') + '<br><span class="tag ' + (r.type === 'final' ? 'tag-final' : 'tag-preview') + '">' + (r.type === 'final' ? '正式' : '预估') + '</span></div>';
-            html += '<div>' + (r.stageName || '-') + '<br><span class="muted">模式:' + (r.anchorMode === 'triple' ? '三锚' : '双锚') + '</span></div>';
+            var cleanStage = (r.stageName || '-').replace(/^\d+\.\s*/, '');
+            html += '<div>' + cleanStage + '<br><span class="muted">模式:' + (r.anchorMode === 'triple' ? '三锚' : '双锚') + '</span></div>';
             html += '<div>置信度<br><b>' + (r.confidence || 0) + '</b></div>';
             html += '</div>';
         });
