@@ -20,7 +20,7 @@
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body {
             margin: 0;
-            padding: 12px 12px calc(88px + env(safe-area-inset-bottom));
+            padding: 12px 12px calc(110px + env(safe-area-inset-bottom));
             background: linear-gradient(180deg, #f9fbff 0%, #f3f6fb 100%);
             color: var(--text);
             font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -114,6 +114,7 @@
             display: flex;
             justify-content: flex-end;
             margin-top: 4px;
+            margin-bottom: 8px;
         }
         .paste-btn {
             border: 1px solid #dce6f3;
@@ -193,29 +194,107 @@
             font-size: 12px;
             margin-bottom: 8px;
         }
+        .review-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            gap: 8px;
+        }
+        .review-meta {
+            font-size: 12px;
+            color: #6c7e8f;
+            flex: 1;
+        }
+        .review-tools {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        .range-select {
+            width: auto;
+            min-width: 96px;
+            padding: 7px 8px;
+            font-size: 12px;
+            border-radius: 8px;
+        }
+        .canvas-wrap {
+            background: #fcfdff;
+            border: 1px solid #dfe8f3;
+            border-radius: 10px;
+            padding: 6px;
+            margin-bottom: 10px;
+        }
+        #stageChart {
+            width: 100%;
+            height: 220px;
+            display: block;
+        }
+        .record-list {
+            max-height: 220px;
+            overflow: auto;
+            border: 1px solid #e4ebf3;
+            border-radius: 10px;
+            background: #fff;
+        }
+        .record-item {
+            display: grid;
+            grid-template-columns: 88px 1fr 70px;
+            gap: 8px;
+            align-items: center;
+            padding: 9px 10px;
+            border-bottom: 1px solid #edf2f7;
+            font-size: 12px;
+        }
+        .record-item:last-child { border-bottom: none; }
+        .tag {
+            display: inline-block;
+            font-size: 10px;
+            border-radius: 999px;
+            padding: 2px 7px;
+            font-weight: 700;
+            border: 1px solid transparent;
+        }
+        .tag-final {
+            color: #176b43;
+            background: #e9fff3;
+            border-color: #b8ebcf;
+        }
+        .tag-preview {
+            color: #8a6400;
+            background: #fff8dd;
+            border-color: #f4d98c;
+        }
         .sticky-bar {
             position: fixed;
             left: 0;
             right: 0;
             bottom: 0;
             padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
-            background: rgba(245, 248, 252, 0.92);
+            background: rgba(245, 248, 252, 0.94);
             backdrop-filter: blur(8px);
             border-top: 1px solid #d9e2ec;
+        }
+        .action-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
         }
         .main-btn {
             width: 100%;
             border: none;
-            background: var(--primary);
-            color: #fff;
             border-radius: 12px;
-            padding: 15px;
-            font-size: 18px;
+            padding: 14px 10px;
+            font-size: 15px;
             font-weight: 800;
-            box-shadow: 0 6px 14px rgba(217, 72, 65, 0.25);
+            color: #fff;
+            box-shadow: 0 6px 14px rgba(20, 46, 80, 0.16);
         }
+        .btn-preview { background: #5b7c99; }
+        .btn-final { background: var(--primary); }
         .main-btn:active { transform: scale(0.98); }
         #report { display: none; }
+        .muted { color: #8a97a6; font-size: 12px; }
     </style>
 </head>
 <body>
@@ -256,6 +335,10 @@
     <h3>2. 每日指标录入 + 估值锚模式</h3>
     <div class="input-grid">
         <div class="full-width">
+            <label>记录日期（用于正式诊断归档）</label>
+            <input type="date" id="record_date" oninput="saveDaily()" />
+        </div>
+        <div class="full-width">
             <label>估值锚模式</label>
             <select id="anchor_mode" onchange="saveMode()">
                 <option value="dual">双锚（全A ERP + 300 ERP）</option>
@@ -280,15 +363,54 @@
     </div>
 </div>
 <div id="report" class="card"><div id="res_area"></div></div>
+<div class="card">
+    <h3>3. 复盘面板（正式诊断归档）</h3>
+    <div class="review-head">
+        <div class="review-meta" id="review_meta">已归档 0 条正式记录</div>
+        <div class="review-tools">
+            <select id="review_range" class="range-select" onchange="saveReviewRange(); renderReviewPanel();">
+                <option value="all">全部</option>
+                <option value="30">近30天</option>
+                <option value="90">近90天</option>
+                <option value="180">近180天</option>
+            </select>
+            <button class="btn-mini danger" style="width:auto;padding:7px 10px;" onclick="clearRecords()">清空复盘记录</button>
+        </div>
+    </div>
+    <div class="canvas-wrap">
+        <canvas id="stageChart"></canvas>
+    </div>
+    <div class="record-list" id="record_list">
+        <div class="record-item"><span class="muted">暂无记录</span><span></span><span></span></div>
+    </div>
+</div>
 <div class="sticky-bar">
-    <button class="main-btn" onclick="run()">深度诊断</button>
+    <div class="action-row">
+        <button class="main-btn btn-preview" onclick="runDiagnosis(false, false, 'preview')">预估诊断（不更新连续性）</button>
+        <button class="main-btn btn-final" onclick="runDiagnosis(true, true, 'final')">正式诊断（更新连续性）</button>
+    </div>
 </div>
 <script>
     var historyKeys = ['h_alla', 'h_hs300', 'h_pb', 'h_fx'];
     var dailyKeys = [
+        'record_date',
         'c_alla','c_hs300','c_pb','c_fx',
         'amt','idx_chg','to_alla','to_micro','up','limitup','div_excess','im','m_net','m_ratio','etf'
     ];
+    var stageMap = {
+        '1. 启动': 1,
+        '2. 验证': 2,
+        '3. 合力': 3,
+        '4. 分歧': 4,
+        '5. 结束': 5
+    };
+    function todayStr() {
+        var d = new Date();
+        var y = d.getFullYear();
+        var m = String(d.getMonth() + 1).padStart(2, '0');
+        var day = String(d.getDate()).padStart(2, '0');
+        return y + '-' + m + '-' + day;
+    }
     function saveHistory() {
         historyKeys.forEach(function(id) {
             localStorage.setItem(id, document.getElementById(id).value);
@@ -296,6 +418,9 @@
     }
     function saveMode() {
         localStorage.setItem('anchor_mode', document.getElementById('anchor_mode').value);
+    }
+    function saveReviewRange() {
+        localStorage.setItem('review_range', document.getElementById('review_range').value);
     }
     function saveDaily() {
         var obj = {};
@@ -355,24 +480,53 @@
             alert('读取剪贴板失败，请检查浏览器权限后重试。');
         }
     }
+    function getRecords() {
+        var raw = localStorage.getItem('diagnosis_records');
+        if (!raw) return [];
+        try {
+            var arr = JSON.parse(raw);
+            return Array.isArray(arr) ? arr : [];
+        } catch (e) {
+            return [];
+        }
+    }
+    function setRecords(records) {
+        localStorage.setItem('diagnosis_records', JSON.stringify(records));
+    }
+    function upsertFinalRecord(record) {
+        var records = getRecords();
+        var idx = records.findIndex(function(r) {
+            return r && r.type === 'final' && r.date === record.date;
+        });
+        if (idx >= 0) records[idx] = record;
+        else records.push(record);
+        records.sort(function(a, b) {
+            var da = (a.date || '') + ' ' + (a.time || '');
+            var db = (b.date || '') + ' ' + (b.time || '');
+            return da.localeCompare(db);
+        });
+        setRecords(records);
+    }
     function exportBackup() {
         var backup = {
-            version: '1.0.0',
+            version: '2.1.0',
             exportedAt: new Date().toISOString(),
             history: {},
             mode: localStorage.getItem('anchor_mode') || 'triple',
+            review_range: localStorage.getItem('review_range') || 'all',
             daily: {},
             continuity: {
                 prev_stage: localStorage.getItem('prev_stage') || '',
                 prev_streak: localStorage.getItem('prev_streak') || '0'
-            }
+            },
+            diagnosis_records: getRecords()
         };
         historyKeys.forEach(function(k) { backup.history[k] = localStorage.getItem(k) || ''; });
         dailyKeys.forEach(function(k) { backup.daily[k] = document.getElementById(k).value || ''; });
         var blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8' });
         var a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = 'a-share-quant-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+        a.download = 'a-share-quant-backup-' + todayStr() + '.json';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -392,6 +546,7 @@
                     });
                 }
                 if (obj.mode) localStorage.setItem('anchor_mode', obj.mode);
+                if (obj.review_range) localStorage.setItem('review_range', obj.review_range);
                 if (obj.daily && typeof obj.daily === 'object') {
                     localStorage.setItem('daily_inputs', JSON.stringify(obj.daily));
                 }
@@ -399,9 +554,18 @@
                     localStorage.setItem('prev_stage', obj.continuity.prev_stage || '');
                     localStorage.setItem('prev_streak', String(obj.continuity.prev_streak || '0'));
                 }
+                if (Array.isArray(obj.diagnosis_records)) {
+                    localStorage.setItem('diagnosis_records', JSON.stringify(obj.diagnosis_records));
+                }
                 loadHistory();
                 document.getElementById('anchor_mode').value = localStorage.getItem('anchor_mode') || 'triple';
+                document.getElementById('review_range').value = localStorage.getItem('review_range') || 'all';
                 loadDaily();
+                if (!document.getElementById('record_date').value) {
+                    document.getElementById('record_date').value = todayStr();
+                    saveDaily();
+                }
+                renderReviewPanel();
                 alert('导入成功。');
             } catch (err) {
                 alert('导入失败：文件格式不正确。');
@@ -419,13 +583,18 @@
         localStorage.removeItem('h_pb');
         localStorage.removeItem('h_fx');
         localStorage.removeItem('anchor_mode');
+        localStorage.removeItem('review_range');
         localStorage.removeItem('daily_inputs');
         localStorage.removeItem('prev_stage');
         localStorage.removeItem('prev_streak');
+        localStorage.removeItem('diagnosis_records');
         loadHistory();
         dailyKeys.forEach(function(id) { document.getElementById(id).value = ''; });
+        document.getElementById('record_date').value = todayStr();
         document.getElementById('anchor_mode').value = 'triple';
+        document.getElementById('review_range').value = 'all';
         document.getElementById('report').style.display = 'none';
+        renderReviewPanel();
         alert('已清空全部本地数据。');
     }
     function resetContinuity() {
@@ -433,7 +602,154 @@
         localStorage.removeItem('prev_streak');
         alert('已重置阶段连续性记录。');
     }
-    function run() {
+    function clearRecords() {
+        var ok = confirm('确认清空所有正式复盘记录？此操作不可恢复。');
+        if (!ok) return;
+        localStorage.removeItem('diagnosis_records');
+        renderReviewPanel();
+    }
+    function filterByRange(records, range) {
+        if (!range || range === 'all') return records.slice();
+        var days = parseInt(range, 10);
+        if (isNaN(days) || days <= 0) return records.slice();
+        var end = new Date();
+        end.setHours(23, 59, 59, 999);
+        var start = new Date(end);
+        start.setDate(start.getDate() - (days - 1));
+        start.setHours(0, 0, 0, 0);
+        return records.filter(function(r) {
+            if (!r || !r.date) return false;
+            var d = new Date(r.date + 'T00:00:00');
+            if (isNaN(d.getTime())) return false;
+            return d >= start && d <= end;
+        });
+    }
+    function rangeLabel(range) {
+        if (range === '30') return '近30天';
+        if (range === '90') return '近90天';
+        if (range === '180') return '近180天';
+        return '全部';
+    }
+    function drawStageChart(records) {
+        var canvas = document.getElementById('stageChart');
+        var ctx = canvas.getContext('2d');
+        var ratio = window.devicePixelRatio || 1;
+        var w = canvas.clientWidth;
+        var h = canvas.clientHeight;
+        canvas.width = Math.floor(w * ratio);
+        canvas.height = Math.floor(h * ratio);
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+        var padding = { left: 54, right: 12, top: 12, bottom: 24 };
+        var pw = w - padding.left - padding.right;
+        var ph = h - padding.top - padding.bottom;
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, w, h);
+        ctx.font = '11px sans-serif';
+        ctx.textBaseline = 'middle';
+        for (var i = 1; i <= 5; i++) {
+            var y = padding.top + ph - ((i - 1) / 4) * ph;
+            ctx.strokeStyle = '#e7eef6';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(padding.left, y);
+            ctx.lineTo(w - padding.right, y);
+            ctx.stroke();
+            ctx.fillStyle = '#6f8193';
+            ctx.fillText(i + ' 阶段', 8, y);
+        }
+        ctx.strokeStyle = '#ccd8e5';
+        ctx.beginPath();
+        ctx.moveTo(padding.left, padding.top + ph);
+        ctx.lineTo(w - padding.right, padding.top + ph);
+        ctx.stroke();
+        if (!records.length) {
+            ctx.fillStyle = '#8ea0b2';
+            ctx.font = '12px sans-serif';
+            ctx.fillText('当前时间区间暂无正式记录', padding.left + 8, padding.top + ph / 2);
+            return;
+        }
+        var points = records.map(function(r, idx) {
+            var x = records.length === 1
+                ? padding.left + pw / 2
+                : padding.left + (idx / (records.length - 1)) * pw;
+            var y = padding.top + ph - ((r.stageIndex - 1) / 4) * ph;
+            return { x: x, y: y, rec: r };
+        });
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, padding.top + ph);
+        points.forEach(function(p) { ctx.lineTo(p.x, p.y); });
+        ctx.lineTo(points[points.length - 1].x, padding.top + ph);
+        ctx.closePath();
+        var grd = ctx.createLinearGradient(0, padding.top, 0, padding.top + ph);
+        grd.addColorStop(0, 'rgba(46,134,193,0.20)');
+        grd.addColorStop(1, 'rgba(46,134,193,0.02)');
+        ctx.fillStyle = grd;
+        ctx.fill();
+        ctx.strokeStyle = '#2e86c1';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        points.forEach(function(p, i) {
+            if (i === 0) ctx.moveTo(p.x, p.y);
+            else ctx.lineTo(p.x, p.y);
+        });
+        ctx.stroke();
+        points.forEach(function(p) {
+            var conf = p.rec.confidence || 50;
+            var r = 3 + Math.max(0, Math.min(4, (conf - 50) / 12));
+            ctx.beginPath();
+            ctx.fillStyle = '#ffffff';
+            ctx.arc(p.x, p.y, r + 1.2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.fillStyle = '#1f6ca1';
+            ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        ctx.fillStyle = '#6f8193';
+        ctx.font = '10px sans-serif';
+        var labelCount = Math.min(5, records.length);
+        for (var j = 0; j < labelCount; j++) {
+            var idx2 = Math.round((j / (labelCount - 1 || 1)) * (records.length - 1));
+            var rec = records[idx2];
+            var p2 = points[idx2];
+            var txt = (rec.date || '').slice(5);
+            ctx.fillText(txt, p2.x - 14, h - 8);
+        }
+    }
+    function renderRecordList(records) {
+        var box = document.getElementById('record_list');
+        if (!records.length) {
+            box.innerHTML = '<div class="record-item"><span class="muted">当前区间暂无正式记录</span><span></span><span></span></div>';
+            return;
+        }
+        var recent = records.slice(-30).reverse();
+        var html = '';
+        recent.forEach(function(r) {
+            html += '<div class="record-item">';
+            html += '<div>' + (r.date || '-') + '<br><span class="tag ' + (r.type === 'final' ? 'tag-final' : 'tag-preview') + '">' + (r.type === 'final' ? '正式' : '预估') + '</span></div>';
+            html += '<div>' + (r.stageName || '-') + '<br><span class="muted">模式:' + (r.anchorMode === 'triple' ? '三锚' : '双锚') + '</span></div>';
+            html += '<div>置信度<br><b>' + (r.confidence || 0) + '</b></div>';
+            html += '</div>';
+        });
+        box.innerHTML = html;
+    }
+    function renderReviewPanel() {
+        var all = getRecords();
+        var finalsAll = all.filter(function(r) { return r && r.type === 'final'; })
+            .sort(function(a, b) {
+                var da = (a.date || '') + ' ' + (a.time || '');
+                var db = (b.date || '') + ' ' + (b.time || '');
+                return da.localeCompare(db);
+            });
+        var range = document.getElementById('review_range').value || 'all';
+        var finals = filterByRange(finalsAll, range);
+        document.getElementById('review_meta').textContent =
+            '正式记录 ' + finalsAll.length + ' 条 ｜ 当前显示 ' + finals.length + ' 条（' + rangeLabel(range) + '）';
+        drawStageChart(finals);
+        renderRecordList(finals);
+    }
+    function runDiagnosis(updateContinuity, persistResult, modeType) {
         saveDaily();
         var qA = getQ(document.getElementById('h_alla').value, parseFloat(document.getElementById('c_alla').value));
         var qH = getQ(document.getElementById('h_hs300').value, parseFloat(document.getElementById('c_hs300').value));
@@ -454,7 +770,6 @@
             etf: parseFloat(document.getElementById('etf').value) || 0
         };
         var s = { start: 0, verify: 0, synergy: 0, div: 0, end: 0 };
-        // 估值双锚/三锚
         var erpHighCnt = (qA > 0.8 ? 1 : 0) + (qH > 0.8 ? 1 : 0);
         var erpLowCnt = (qA < 0.2 ? 1 : 0) + (qH < 0.2 ? 1 : 0);
         if (erpHighCnt === 2) s.start += 3;
@@ -468,7 +783,6 @@
             if (qP > 0.8) s.div += 1.5;
             if (qP > 0.9) s.end += 0.5;
         }
-        // 核心矩阵
         if (fxT < -0.8) s.start += 2;
         if (d.up > 58) s.start += 2;
         if (d.limitup > 2.5) s.start += 1.5;
@@ -491,7 +805,6 @@
             { n: '4. 分歧', v: s.div },
             { n: '5. 结束', v: s.end }
         ].sort(function(a, b) { return b.v - a.v; });
-        // 置信度构成
         var top = res[0].v;
         var second = res[1].v;
         var diff = top - second;
@@ -506,17 +819,22 @@
         var prevStreak = parseInt(localStorage.getItem('prev_streak') || '0', 10);
         var continuityAdj = 0;
         var continuityText = '连续性修正：0';
+        var newStreak = prevStreak;
         if (prevStage) {
             if (currentStage === prevStage) {
                 if (prevStreak >= 4) continuityAdj = 8;
                 else if (prevStreak >= 2) continuityAdj = 5;
                 else continuityAdj = 2;
                 continuityText = '连续性修正：+' + continuityAdj + '（阶段连续）';
+                newStreak = prevStreak + 1;
             } else {
                 if (prevStreak >= 3) continuityAdj = -8;
                 else continuityAdj = -4;
                 continuityText = '连续性修正：' + continuityAdj + '（阶段跳变）';
+                newStreak = 1;
             }
+        } else {
+            newStreak = 1;
         }
         var rawConf = baseConf + lowTopAdj + anchorAdj + tripleAdj + continuityAdj;
         var conf = Math.max(5, Math.min(99, rawConf));
@@ -525,15 +843,47 @@
         else if (conf >= 65) confLevel = '中高';
         else if (conf >= 50) confLevel = '中等';
         else confLevel = '偏低';
-        var newStreak = (currentStage === prevStage) ? (prevStreak + 1) : 1;
-        localStorage.setItem('prev_stage', currentStage);
-        localStorage.setItem('prev_streak', String(newStreak));
-        // 输出
+        if (updateContinuity) {
+            localStorage.setItem('prev_stage', currentStage);
+            localStorage.setItem('prev_streak', String(newStreak));
+        }
+        var dateVal = document.getElementById('record_date').value || todayStr();
+        document.getElementById('record_date').value = dateVal;
+        saveDaily();
+        if (persistResult) {
+            var now = new Date();
+            var hh = String(now.getHours()).padStart(2, '0');
+            var mm = String(now.getMinutes()).padStart(2, '0');
+            var ss = String(now.getSeconds()).padStart(2, '0');
+            var record = {
+                type: modeType || 'final',
+                date: dateVal,
+                time: hh + ':' + mm + ':' + ss,
+                stageName: currentStage,
+                stageIndex: stageMap[currentStage] || 0,
+                confidence: Number(conf.toFixed(0)),
+                confidenceLevel: confLevel,
+                anchorMode: anchorMode,
+                scores: {
+                    start: s.start,
+                    verify: s.verify,
+                    synergy: s.synergy,
+                    div: s.div,
+                    end: s.end
+                }
+            };
+            upsertFinalRecord(record);
+            renderReviewPanel();
+        }
         document.getElementById('report').style.display = 'block';
+        var runTypeText = updateContinuity ? '正式诊断（已更新连续性）' : '预估诊断（未更新连续性）';
+        var streakText = updateContinuity
+            ? ('连续性修正：已按本次结果写入；当前连续次数：' + newStreak)
+            : ('连续性修正：仅参考，不写入历史；当前历史连续次数保持为 ' + (prevStreak || 0));
         var h = '';
         h += '<div class="result-title">' + currentStage + '阶段</div>';
-        h += '<div class="confidence">阶段置信度：<b>' + conf.toFixed(0) + '</b>/100（' + confLevel + '）</div>';
-        h += '<div class="confidence-note">' + continuityText + '，当前连续次数：' + newStreak + '</div>';
+        h += '<div class="confidence">' + runTypeText + ' ｜ 阶段置信度：<b>' + conf.toFixed(0) + '</b>/100（' + confLevel + '）</div>';
+        h += '<div class="confidence-note">' + continuityText + ' ｜ ' + streakText + '</div>';
         h += '<div class="confidence-breakdown">';
         h += '<div class="title">置信度构成明细</div>';
         h += '<div><strong>基础分：</strong>' + baseConf.toFixed(1) + '（由阶段分差 ' + diff.toFixed(1) + ' 计算）</div>';
@@ -569,11 +919,19 @@
         document.getElementById('res_area').innerHTML = h;
         window.scrollTo(0, document.body.scrollHeight);
     }
-    // 初始化
+    window.addEventListener('resize', function() {
+        renderReviewPanel();
+    });
     window.onload = function() {
         loadHistory();
         document.getElementById('anchor_mode').value = localStorage.getItem('anchor_mode') || 'triple';
+        document.getElementById('review_range').value = localStorage.getItem('review_range') || 'all';
         loadDaily();
+        if (!document.getElementById('record_date').value) {
+            document.getElementById('record_date').value = todayStr();
+            saveDaily();
+        }
+        renderReviewPanel();
     };
 </script>
 </body>
